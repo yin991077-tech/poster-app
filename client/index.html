@@ -68,7 +68,7 @@ async function generate() {
     return;
   }
 
-  const res = await fetch("http://localhost:3001/api/parse?url=" + encodeURIComponent(url));
+  const res = await fetch("https://poster-app-lds4.onrender.com/api/parse?url=" + encodeURIComponent(url));
   const data = await res.json();
 
   ctx.fillStyle = "#fff";
