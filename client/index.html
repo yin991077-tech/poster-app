@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>海报生成器 350x250</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      padding: 20px;
+    }
+    input {
+      width: 300px;
+      padding: 6px;
+    }
+    button {
+      padding: 6px 12px;
+      margin-left: 10px;
+      cursor: pointer;
+    }
+    canvas {
+      margin-top: 20px;
+      border: 1px solid #ccc;
+    }
+  </style>
+</head>
+
+<body>
+
+<h2>Google Play 海报生成器 350x250</h2>
+
+<input id="urlInput" placeholder="粘贴 Google Play 链接" />
+<button onclick="generate()">生成</button>
+<button onclick="download()">下载图片</button>
+
+<br/>
+
+<canvas id="canvas" width="350" height="250"></canvas>
+
+<script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
+  const words = text.split("");
+  let line = "";
+
+  for (let i = 0; i < words.length; i++) {
+    const testLine = line + words[i];
+    const testWidth = ctx.measureText(testLine).width;
+
+    if (testWidth > maxWidth && i > 0) {
+      ctx.fillText(line, x, y);
+      line = words[i];
+      y += lineHeight;
+    } else {
+      line = testLine;
+    }
+  }
+  ctx.fillText(line, x, y);
+}
+
+async function generate() {
+  const url = document.getElementById("urlInput").value;
+
+  if (!url) {
+    alert("请输入链接");
+    return;
+  }
+
+  const res = await fetch("http://localhost:3001/api/parse?url=" + encodeURIComponent(url));
+  const data = await res.json();
+
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  const img = new Image();
+  img.crossOrigin = "anonymous";
+  img.src = data.image;
+
+  img.onload = () => {
+    ctx.drawImage(img, 0, 0, 350, 100);
+
+    ctx.fillStyle = "#000";
+    ctx.font = "bold 16px sans-serif";
+    wrapText(ctx, data.title, 5, 120, 340, 18);
+
+    ctx.font = "12px sans-serif";
+    wrapText(ctx, data.description, 5, 150, 340, 16);
+  };
+}
+
+function download() {
+  const link = document.createElement("a");
+  link.download = "poster_350x250.png";
+  link.href = canvas.toDataURL("image/png");
+  link.click();
+}
+</script>
+
+</body>
+</html>
