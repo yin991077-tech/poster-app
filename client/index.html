@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8" />
-  <title>专业海报生成器</title>
+  <title>专业海报生成器（终极版）</title>
   <style>
     body {
       font-family: -apple-system, BlinkMacSystemFont, sans-serif;
@@ -11,16 +11,12 @@
       background: #f5f5f5;
     }
 
-    h2 {
-      margin-bottom: 20px;
-    }
-
     input {
       padding: 8px;
       margin: 5px;
       width: 160px;
-      border: 1px solid #ccc;
       border-radius: 6px;
+      border: 1px solid #ccc;
     }
 
     button {
@@ -33,10 +29,6 @@
       cursor: pointer;
     }
 
-    button:hover {
-      background: #4096ff;
-    }
-
     canvas {
       margin-top: 20px;
       border-radius: 12px;
@@ -47,7 +39,7 @@
 </head>
 <body>
 
-<h2>🎨 专业海报生成器</h2>
+<h2>🎨 专业海报生成器（终极版）</h2>
 
 <input id="urlInput" placeholder="粘贴链接" />
 <input id="widthInput" placeholder="宽度（默认350）" />
@@ -65,8 +57,8 @@
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 
-// ===== 居中自动换行 =====
-function wrapTextCenter(ctx, text, x, y, maxWidth, lineHeight) {
+// ===== 自动换行拆分 =====
+function getLines(ctx, text, maxWidth) {
   const chars = text.split("");
   let line = "";
   let lines = [];
@@ -83,13 +75,37 @@ function wrapTextCenter(ctx, text, x, y, maxWidth, lineHeight) {
     }
   }
   lines.push(line);
-
-  lines.forEach((l, i) => {
-    ctx.fillText(l, x, y + i * lineHeight);
-  });
+  return lines;
 }
 
-// ===== 主生成函数 =====
+// ===== 自动适配字体 =====
+function getFitFontSize(ctx, text, maxWidth, maxHeight, startSize) {
+  let fontSize = startSize;
+
+  while (fontSize > 10) {
+    ctx.font = `bold ${fontSize}px sans-serif`;
+
+    let lines = getLines(ctx, text, maxWidth);
+
+    // 限制最大3行
+    if (lines.length > 3) {
+      lines = lines.slice(0, 3);
+      lines[2] += "...";
+    }
+
+    const totalHeight = lines.length * (fontSize + 6);
+
+    if (totalHeight <= maxHeight) {
+      return { fontSize, lines };
+    }
+
+    fontSize -= 1;
+  }
+
+  return { fontSize: 10, lines: getLines(ctx, text, maxWidth) };
+}
+
+// ===== 主函数 =====
 async function generate() {
   const url = document.getElementById("urlInput").value;
 
@@ -114,15 +130,14 @@ async function generate() {
 
     img.onload = () => {
 
-      // ===== 布局参数 =====
       const padding = width * 0.05;
       const imageHeight = height * 0.5;
 
       // ===== 背景 =====
-      ctx.fillStyle = "#ffffff";
+      ctx.fillStyle = "#fff";
       ctx.fillRect(0, 0, width, height);
 
-      // ===== 自动裁剪（不变形）=====
+      // ===== 自动裁剪不变形 =====
       const iw = img.width;
       const ih = img.height;
 
@@ -143,61 +158,71 @@ async function generate() {
         sy = (ih - sh) / 2;
       }
 
-      // ===== 圆角裁剪 =====
+      // 圆角图片
       ctx.save();
       ctx.beginPath();
       ctx.roundRect(0, 0, width, imageHeight, 16);
       ctx.clip();
-
       ctx.drawImage(img, sx, sy, sw, sh, 0, 0, width, imageHeight);
       ctx.restore();
 
-      // ===== 渐变遮罩 =====
+      // 渐变遮罩
       const gradient = ctx.createLinearGradient(0, imageHeight - 60, 0, imageHeight);
       gradient.addColorStop(0, "transparent");
       gradient.addColorStop(1, "rgba(0,0,0,0.4)");
-
       ctx.fillStyle = gradient;
       ctx.fillRect(0, imageHeight - 60, width, 60);
 
-      // ===== 标题 =====
       ctx.textAlign = "center";
-      ctx.fillStyle = "#111";
 
-      const titleSize = Math.floor(width * 0.07);
-      ctx.font = `bold ${titleSize}px sans-serif`;
+      // ===== 标题（自适应）=====
+      const titleAreaHeight = height * 0.2;
 
-      wrapTextCenter(
+      const { fontSize: titleSize, lines: titleLines } = getFitFontSize(
         ctx,
         data.title || "示例标题",
-        width / 2,
-        imageHeight + padding,
         width - padding * 2,
-        titleSize + 6
+        titleAreaHeight,
+        Math.floor(width * 0.08)
       );
 
-      // ===== 描述 =====
-      const descSize = Math.floor(width * 0.045);
+      ctx.font = `bold ${titleSize}px sans-serif`;
+      ctx.fillStyle = "#111";
+
+      titleLines.forEach((line, i) => {
+        ctx.fillText(
+          line,
+          width / 2,
+          imageHeight + padding + i * (titleSize + 6)
+        );
+      });
+
+      // ===== 描述（自适应）=====
+      const descAreaHeight = height * 0.2;
+
+      const { fontSize: descSize, lines: descLines } = getFitFontSize(
+        ctx,
+        data.description || "示例描述",
+        width - padding * 2,
+        descAreaHeight,
+        Math.floor(width * 0.05)
+      );
+
       ctx.font = `${descSize}px sans-serif`;
       ctx.fillStyle = "#555";
 
-      wrapTextCenter(
-        ctx,
-        data.description || "示例描述",
-        width / 2,
-        imageHeight + padding + titleSize * 2,
-        width - padding * 2,
-        descSize + 6
-      );
-    };
-
-    img.onerror = () => {
-      alert("图片加载失败");
+      descLines.forEach((line, i) => {
+        ctx.fillText(
+          line,
+          width / 2,
+          imageHeight + padding + titleSize * 2 + i * (descSize + 6)
+        );
+      });
     };
 
   } catch (err) {
     console.error(err);
-    alert("请求失败，请检查后端");
+    alert("请求失败");
   }
 }
 
