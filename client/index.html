@@ -2,36 +2,56 @@
 <html>
 <head>
   <meta charset="UTF-8" />
-  <title>海报生成器（自定义尺寸 + 自动裁剪）</title>
+  <title>专业海报生成器</title>
   <style>
     body {
-      font-family: sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
       text-align: center;
       padding: 20px;
+      background: #f5f5f5;
     }
+
+    h2 {
+      margin-bottom: 20px;
+    }
+
     input {
-      padding: 6px;
+      padding: 8px;
       margin: 5px;
-      width: 150px;
+      width: 160px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
     }
+
     button {
-      padding: 6px 12px;
+      padding: 8px 16px;
       margin: 5px;
+      border: none;
+      border-radius: 6px;
+      background: #1677ff;
+      color: white;
       cursor: pointer;
     }
+
+    button:hover {
+      background: #4096ff;
+    }
+
     canvas {
       margin-top: 20px;
-      border: 1px solid #ccc;
+      border-radius: 12px;
+      background: white;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
     }
   </style>
 </head>
 <body>
 
-<h2>海报生成器（自定义尺寸 + 自动裁剪）</h2>
+<h2>🎨 专业海报生成器</h2>
 
 <input id="urlInput" placeholder="粘贴链接" />
-<input id="widthInput" placeholder="宽度 (默认350)" />
-<input id="heightInput" placeholder="高度 (默认250)" />
+<input id="widthInput" placeholder="宽度（默认350）" />
+<input id="heightInput" placeholder="高度（默认250）" />
 
 <br/>
 
@@ -45,24 +65,31 @@
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 
-// 自动换行
-function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
-  const words = text.split("");
+// ===== 居中自动换行 =====
+function wrapTextCenter(ctx, text, x, y, maxWidth, lineHeight) {
+  const chars = text.split("");
   let line = "";
-  for (let i = 0; i < words.length; i++) {
-    const testLine = line + words[i];
+  let lines = [];
+
+  for (let i = 0; i < chars.length; i++) {
+    const testLine = line + chars[i];
     const testWidth = ctx.measureText(testLine).width;
+
     if (testWidth > maxWidth && i > 0) {
-      ctx.fillText(line, x, y);
-      line = words[i];
-      y += lineHeight;
+      lines.push(line);
+      line = chars[i];
     } else {
       line = testLine;
     }
   }
-  ctx.fillText(line, x, y);
+  lines.push(line);
+
+  lines.forEach((l, i) => {
+    ctx.fillText(l, x, y + i * lineHeight);
+  });
 }
 
+// ===== 主生成函数 =====
 async function generate() {
   const url = document.getElementById("urlInput").value;
 
@@ -78,54 +105,90 @@ async function generate() {
   }
 
   try {
-    console.log("请求:", url);
-
-    const res = await fetch("https://poster-app-lds4.onrender.com/api/parse?url=" + encodeURIComponent(url));
+    const res = await fetch("https://poster-app-xi-two.vercel.app//api/parse?url=" + encodeURIComponent(url));
     const data = await res.json();
-
-    console.log("返回:", data);
-
-    ctx.fillStyle = "#fff";
-    ctx.fillRect(0, 0, width, height);
 
     const img = new Image();
     img.crossOrigin = "anonymous";
     img.src = data.image;
 
     img.onload = () => {
+
+      // ===== 布局参数 =====
+      const padding = width * 0.05;
+      const imageHeight = height * 0.5;
+
+      // ===== 背景 =====
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, width, height);
+
+      // ===== 自动裁剪（不变形）=====
       const iw = img.width;
       const ih = img.height;
 
-      const canvasRatio = width / height;
+      const canvasRatio = width / imageHeight;
       const imgRatio = iw / ih;
 
       let sx, sy, sw, sh;
 
       if (imgRatio > canvasRatio) {
-        // 横图 → 裁左右
         sh = ih;
         sw = ih * canvasRatio;
         sx = (iw - sw) / 2;
         sy = 0;
       } else {
-        // 竖图 → 裁上下
         sw = iw;
         sh = iw / canvasRatio;
         sx = 0;
         sy = (ih - sh) / 2;
       }
 
-      // 图片区域（上40%）
-      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, width, height * 0.4);
+      // ===== 圆角裁剪 =====
+      ctx.save();
+      ctx.beginPath();
+      ctx.roundRect(0, 0, width, imageHeight, 16);
+      ctx.clip();
 
-      // 标题
-      ctx.fillStyle = "#000";
-      ctx.font = "bold " + Math.floor(height * 0.07) + "px sans-serif";
-      wrapText(ctx, data.title || "示例标题", 10, height * 0.5, width - 20, 20);
+      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, width, imageHeight);
+      ctx.restore();
 
-      // 描述
-      ctx.font = Math.floor(height * 0.05) + "px sans-serif";
-      wrapText(ctx, data.description || "示例描述", 10, height * 0.7, width - 20, 18);
+      // ===== 渐变遮罩 =====
+      const gradient = ctx.createLinearGradient(0, imageHeight - 60, 0, imageHeight);
+      gradient.addColorStop(0, "transparent");
+      gradient.addColorStop(1, "rgba(0,0,0,0.4)");
+
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, imageHeight - 60, width, 60);
+
+      // ===== 标题 =====
+      ctx.textAlign = "center";
+      ctx.fillStyle = "#111";
+
+      const titleSize = Math.floor(width * 0.07);
+      ctx.font = `bold ${titleSize}px sans-serif`;
+
+      wrapTextCenter(
+        ctx,
+        data.title || "示例标题",
+        width / 2,
+        imageHeight + padding,
+        width - padding * 2,
+        titleSize + 6
+      );
+
+      // ===== 描述 =====
+      const descSize = Math.floor(width * 0.045);
+      ctx.font = `${descSize}px sans-serif`;
+      ctx.fillStyle = "#555";
+
+      wrapTextCenter(
+        ctx,
+        data.description || "示例描述",
+        width / 2,
+        imageHeight + padding + titleSize * 2,
+        width - padding * 2,
+        descSize + 6
+      );
     };
 
     img.onerror = () => {
@@ -138,7 +201,7 @@ async function generate() {
   }
 }
 
-// 下载
+// ===== 下载 =====
 function download() {
   const link = document.createElement("a");
   link.download = "poster.png";
