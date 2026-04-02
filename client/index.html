@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8" />
-  <title>海报生成器 350x250</title>
+  <title>海报生成器（自定义尺寸 + 自动裁剪）</title>
   <style>
     body {
       font-family: sans-serif;
@@ -10,12 +10,13 @@
       padding: 20px;
     }
     input {
-      width: 300px;
       padding: 6px;
+      margin: 5px;
+      width: 150px;
     }
     button {
       padding: 6px 12px;
-      margin-left: 10px;
+      margin: 5px;
       cursor: pointer;
     }
     canvas {
@@ -24,31 +25,33 @@
     }
   </style>
 </head>
-
 <body>
 
-<h2>Google Play 海报生成器 350x250</h2>
+<h2>海报生成器（自定义尺寸 + 自动裁剪）</h2>
 
-<input id="urlInput" placeholder="粘贴 Google Play 链接" />
-<button onclick="generate()">生成</button>
-<button onclick="download()">下载图片</button>
+<input id="urlInput" placeholder="粘贴链接" />
+<input id="widthInput" placeholder="宽度 (默认350)" />
+<input id="heightInput" placeholder="高度 (默认250)" />
 
 <br/>
 
+<button onclick="generate()">生成</button>
+<button onclick="download()">下载</button>
+
+<br/>
 <canvas id="canvas" width="350" height="250"></canvas>
 
 <script>
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 
+// 自动换行
 function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
   const words = text.split("");
   let line = "";
-
   for (let i = 0; i < words.length; i++) {
     const testLine = line + words[i];
     const testWidth = ctx.measureText(testLine).width;
-
     if (testWidth > maxWidth && i > 0) {
       ctx.fillText(line, x, y);
       line = words[i];
@@ -63,36 +66,82 @@ function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
 async function generate() {
   const url = document.getElementById("urlInput").value;
 
+  const width = parseInt(document.getElementById("widthInput").value) || 350;
+  const height = parseInt(document.getElementById("heightInput").value) || 250;
+
+  canvas.width = width;
+  canvas.height = height;
+
   if (!url) {
     alert("请输入链接");
     return;
   }
 
-  const res = await fetch("https://poster-app-lds4.onrender.com/api/parse?url=" + encodeURIComponent(url));
-  const data = await res.json();
+  try {
+    console.log("请求:", url);
 
-  ctx.fillStyle = "#fff";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const res = await fetch("https://你的render地址/api/parse?url=" + encodeURIComponent(url));
+    const data = await res.json();
 
-  const img = new Image();
-  img.crossOrigin = "anonymous";
-  img.src = data.image;
+    console.log("返回:", data);
 
-  img.onload = () => {
-    ctx.drawImage(img, 0, 0, 350, 100);
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, width, height);
 
-    ctx.fillStyle = "#000";
-    ctx.font = "bold 16px sans-serif";
-    wrapText(ctx, data.title, 5, 120, 340, 18);
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.src = data.image;
 
-    ctx.font = "12px sans-serif";
-    wrapText(ctx, data.description, 5, 150, 340, 16);
-  };
+    img.onload = () => {
+      const iw = img.width;
+      const ih = img.height;
+
+      const canvasRatio = width / height;
+      const imgRatio = iw / ih;
+
+      let sx, sy, sw, sh;
+
+      if (imgRatio > canvasRatio) {
+        // 横图 → 裁左右
+        sh = ih;
+        sw = ih * canvasRatio;
+        sx = (iw - sw) / 2;
+        sy = 0;
+      } else {
+        // 竖图 → 裁上下
+        sw = iw;
+        sh = iw / canvasRatio;
+        sx = 0;
+        sy = (ih - sh) / 2;
+      }
+
+      // 图片区域（上40%）
+      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, width, height * 0.4);
+
+      // 标题
+      ctx.fillStyle = "#000";
+      ctx.font = "bold " + Math.floor(height * 0.07) + "px sans-serif";
+      wrapText(ctx, data.title || "示例标题", 10, height * 0.5, width - 20, 20);
+
+      // 描述
+      ctx.font = Math.floor(height * 0.05) + "px sans-serif";
+      wrapText(ctx, data.description || "示例描述", 10, height * 0.7, width - 20, 18);
+    };
+
+    img.onerror = () => {
+      alert("图片加载失败");
+    };
+
+  } catch (err) {
+    console.error(err);
+    alert("请求失败，请检查后端");
+  }
 }
 
+// 下载
 function download() {
   const link = document.createElement("a");
-  link.download = "poster_350x250.png";
+  link.download = "poster.png";
   link.href = canvas.toDataURL("image/png");
   link.click();
 }
