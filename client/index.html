@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8" />
-  <title>专业海报生成器（终极版）</title>
+  <title>专业海报生成器（模板系统）</title>
   <style>
     body {
       font-family: -apple-system, BlinkMacSystemFont, sans-serif;
@@ -11,7 +11,7 @@
       background: #f5f5f5;
     }
 
-    input {
+    input, select {
       padding: 8px;
       margin: 5px;
       width: 160px;
@@ -39,11 +39,16 @@
 </head>
 <body>
 
-<h2>🎨 专业海报生成器（终极版）</h2>
+<h2>🎨 专业海报生成器（模板系统）</h2>
 
 <input id="urlInput" placeholder="粘贴链接" />
 <input id="widthInput" placeholder="宽度（默认350）" />
 <input id="heightInput" placeholder="高度（默认250）" />
+<select id="template">
+  <option value="a">电商风</option>
+  <option value="b">小红书风</option>
+  <option value="c">横版Banner</option>
+</select>
 
 <br/>
 
@@ -62,11 +67,9 @@ function getLines(ctx, text, maxWidth) {
   const chars = text.split("");
   let line = "";
   let lines = [];
-
   for (let i = 0; i < chars.length; i++) {
     const testLine = line + chars[i];
     const testWidth = ctx.measureText(testLine).width;
-
     if (testWidth > maxWidth && i > 0) {
       lines.push(line);
       line = chars[i];
@@ -81,156 +84,188 @@ function getLines(ctx, text, maxWidth) {
 // ===== 自动适配字体 =====
 function getFitFontSize(ctx, text, maxWidth, maxHeight, startSize) {
   let fontSize = startSize;
-
   while (fontSize > 10) {
     ctx.font = `bold ${fontSize}px sans-serif`;
-
     let lines = getLines(ctx, text, maxWidth);
-
-    // 限制最大3行
     if (lines.length > 3) {
-      lines = lines.slice(0, 3);
+      lines = lines.slice(0,3);
       lines[2] += "...";
     }
-
     const totalHeight = lines.length * (fontSize + 6);
-
     if (totalHeight <= maxHeight) {
       return { fontSize, lines };
     }
-
     fontSize -= 1;
   }
-
   return { fontSize: 10, lines: getLines(ctx, text, maxWidth) };
 }
 
-// ===== 主函数 =====
+// ===== 绘制模板A：电商风 =====
+function drawTemplateA(ctx, data, width, height) {
+  const padding = width * 0.05;
+  const imageHeight = height * 0.5;
+
+  // 背景
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, width, height);
+
+  // 图片
+  const img = new Image();
+  img.crossOrigin = "anonymous";
+  img.src = data.image;
+  img.onload = () => {
+    const iw = img.width;
+    const ih = img.height;
+    const canvasRatio = width / imageHeight;
+    const imgRatio = iw / ih;
+    let sx, sy, sw, sh;
+    if (imgRatio > canvasRatio) {
+      sh = ih; sw = ih * canvasRatio; sx = (iw - sw)/2; sy = 0;
+    } else {
+      sw = iw; sh = iw / canvasRatio; sx = 0; sy = (ih - sh)/2;
+    }
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(0, 0, width, imageHeight, 16);
+    ctx.clip();
+    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, width, imageHeight);
+    ctx.restore();
+
+    // 标题
+    const titleAreaHeight = height * 0.2;
+    const { fontSize: titleSize, lines: titleLines } = getFitFontSize(ctx, data.title || "示例标题", width - padding*2, titleAreaHeight, Math.floor(width*0.08));
+    ctx.font = `bold ${titleSize}px sans-serif`;
+    ctx.fillStyle = "#111";
+    ctx.textAlign = "center";
+    titleLines.forEach((line,i)=>{
+      ctx.fillText(line, width/2, imageHeight + padding + i*(titleSize+6));
+    });
+
+    // 描述
+    const descAreaHeight = height * 0.2;
+    const { fontSize: descSize, lines: descLines } = getFitFontSize(ctx, data.description || "示例描述", width-padding*2, descAreaHeight, Math.floor(width*0.05));
+    ctx.font = `${descSize}px sans-serif`;
+    ctx.fillStyle = "#555";
+    descLines.forEach((line,i)=>{
+      ctx.fillText(line, width/2, imageHeight + padding + titleSize*2 + i*(descSize+6));
+    });
+  };
+}
+
+// ===== 绘制模板B：小红书风 =====
+function drawTemplateB(ctx, data, width, height) {
+  const padding = width * 0.06;
+  const imageHeight = height * 0.6;
+  ctx.fillStyle = "#fefefe";
+  ctx.fillRect(0, 0, width, height);
+
+  const img = new Image();
+  img.crossOrigin = "anonymous";
+  img.src = data.image;
+  img.onload = () => {
+    const iw = img.width;
+    const ih = img.height;
+    const canvasRatio = width / imageHeight;
+    const imgRatio = iw / ih;
+    let sx, sy, sw, sh;
+    if (imgRatio > canvasRatio) { sh=ih; sw=ih*canvasRatio; sx=(iw-sw)/2; sy=0; }
+    else { sw=iw; sh=iw/canvasRatio; sx=0; sy=(ih-sh)/2; }
+    ctx.drawImage(img,sx,sy,sw,sh,0,0,width,imageHeight);
+
+    // 标题居中叠加在图片下方
+    const titleAreaHeight = height*0.15;
+    const { fontSize: titleSize, lines: titleLines } = getFitFontSize(ctx, data.title || "示例标题", width-padding*2, titleAreaHeight, Math.floor(width*0.07));
+    ctx.font = `bold ${titleSize}px sans-serif`;
+    ctx.fillStyle = "#222";
+    ctx.textAlign = "center";
+    titleLines.forEach((line,i)=>{
+      ctx.fillText(line,width/2,imageHeight+padding+i*(titleSize+6));
+    });
+
+    // 描述
+    const descAreaHeight = height*0.15;
+    const { fontSize: descSize, lines: descLines } = getFitFontSize(ctx, data.description || "示例描述", width-padding*2, descAreaHeight, Math.floor(width*0.045));
+    ctx.font = `${descSize}px sans-serif`;
+    ctx.fillStyle = "#666";
+    descLines.forEach((line,i)=>{
+      ctx.fillText(line,width/2,imageHeight+padding+titleSize*2+i*(descSize+6));
+    });
+  };
+}
+
+// ===== 绘制模板C：横版Banner =====
+function drawTemplateC(ctx, data, width, height) {
+  const padding = width * 0.04;
+  const imageWidth = width*0.45;
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0,0,width,height);
+
+  const img = new Image();
+  img.crossOrigin = "anonymous";
+  img.src = data.image;
+  img.onload = () => {
+    const iw = img.width;
+    const ih = img.height;
+    const canvasRatio = imageWidth / height;
+    const imgRatio = iw/ih;
+    let sx,sy,sw,sh;
+    if (imgRatio > canvasRatio){ sh=ih; sw=ih*canvasRatio; sx=(iw-sw)/2; sy=0;}
+    else {sw=iw; sh=iw/canvasRatio; sx=0; sy=(ih-sh)/2;}
+    ctx.drawImage(img,sx,sy,sw,sh,0,0,imageWidth,height);
+
+    // 文字区域
+    const textX = imageWidth + padding;
+    const textWidth = width - imageWidth - 2*padding;
+
+    // 标题
+    const titleAreaHeight = height*0.4;
+    const {fontSize:titleSize, lines:titleLines}=getFitFontSize(ctx, data.title||"示例标题", textWidth, titleAreaHeight, Math.floor(textWidth*0.12));
+    ctx.font = `bold ${titleSize}px sans-serif`;
+    ctx.fillStyle="#111";
+    ctx.textAlign="left";
+    titleLines.forEach((line,i)=>{
+      ctx.fillText(line,textX, padding+i*(titleSize+6));
+    });
+
+    // 描述
+    const descAreaHeight = height*0.5;
+    const {fontSize:descSize, lines:descLines}=getFitFontSize(ctx, data.description||"示例描述", textWidth, descAreaHeight, Math.floor(textWidth*0.06));
+    ctx.font = `${descSize}px sans-serif`;
+    ctx.fillStyle="#555";
+    descLines.forEach((line,i)=>{
+      ctx.fillText(line,textX, padding+titleSize*2+i*(descSize+6));
+    });
+  };
+}
+
+// ===== 主生成函数 =====
 async function generate() {
   const url = document.getElementById("urlInput").value;
+  const width = parseInt(document.getElementById("widthInput").value)||350;
+  const height = parseInt(document.getElementById("heightInput").value)||250;
+  canvas.width = width; canvas.height = height;
 
-  const width = parseInt(document.getElementById("widthInput").value) || 350;
-  const height = parseInt(document.getElementById("heightInput").value) || 250;
+  const template = document.getElementById("template").value;
 
-  canvas.width = width;
-  canvas.height = height;
-
-  if (!url) {
-    alert("请输入链接");
-    return;
-  }
+  if(!url){alert("请输入链接"); return;}
 
   try {
-    const res = await fetch("https://poster-app-lds4.onrender.com/api/parse?url=" + encodeURIComponent(url));
+    const res = await fetch("https://poster-app-lds4.onrender.com/api/parse?url="+encodeURIComponent(url));
     const data = await res.json();
 
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.src = data.image;
-
-    img.onload = () => {
-
-      const padding = width * 0.05;
-      const imageHeight = height * 0.5;
-
-      // ===== 背景 =====
-      ctx.fillStyle = "#fff";
-      ctx.fillRect(0, 0, width, height);
-
-      // ===== 自动裁剪不变形 =====
-      const iw = img.width;
-      const ih = img.height;
-
-      const canvasRatio = width / imageHeight;
-      const imgRatio = iw / ih;
-
-      let sx, sy, sw, sh;
-
-      if (imgRatio > canvasRatio) {
-        sh = ih;
-        sw = ih * canvasRatio;
-        sx = (iw - sw) / 2;
-        sy = 0;
-      } else {
-        sw = iw;
-        sh = iw / canvasRatio;
-        sx = 0;
-        sy = (ih - sh) / 2;
-      }
-
-      // 圆角图片
-      ctx.save();
-      ctx.beginPath();
-      ctx.roundRect(0, 0, width, imageHeight, 16);
-      ctx.clip();
-      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, width, imageHeight);
-      ctx.restore();
-
-      // 渐变遮罩
-      const gradient = ctx.createLinearGradient(0, imageHeight - 60, 0, imageHeight);
-      gradient.addColorStop(0, "transparent");
-      gradient.addColorStop(1, "rgba(0,0,0,0.4)");
-      ctx.fillStyle = gradient;
-      ctx.fillRect(0, imageHeight - 60, width, 60);
-
-      ctx.textAlign = "center";
-
-      // ===== 标题（自适应）=====
-      const titleAreaHeight = height * 0.2;
-
-      const { fontSize: titleSize, lines: titleLines } = getFitFontSize(
-        ctx,
-        data.title || "示例标题",
-        width - padding * 2,
-        titleAreaHeight,
-        Math.floor(width * 0.08)
-      );
-
-      ctx.font = `bold ${titleSize}px sans-serif`;
-      ctx.fillStyle = "#111";
-
-      titleLines.forEach((line, i) => {
-        ctx.fillText(
-          line,
-          width / 2,
-          imageHeight + padding + i * (titleSize + 6)
-        );
-      });
-
-      // ===== 描述（自适应）=====
-      const descAreaHeight = height * 0.2;
-
-      const { fontSize: descSize, lines: descLines } = getFitFontSize(
-        ctx,
-        data.description || "示例描述",
-        width - padding * 2,
-        descAreaHeight,
-        Math.floor(width * 0.05)
-      );
-
-      ctx.font = `${descSize}px sans-serif`;
-      ctx.fillStyle = "#555";
-
-      descLines.forEach((line, i) => {
-        ctx.fillText(
-          line,
-          width / 2,
-          imageHeight + padding + titleSize * 2 + i * (descSize + 6)
-        );
-      });
-    };
-
-  } catch (err) {
-    console.error(err);
-    alert("请求失败");
+    if(template==="a"){ drawTemplateA(ctx,data,width,height);}
+    else if(template==="b"){ drawTemplateB(ctx,data,width,height);}
+    else{ drawTemplateC(ctx,data,width,height);}
+  } catch(err){
+    console.error(err); alert("请求失败");
   }
 }
 
 // ===== 下载 =====
 function download() {
-  const link = document.createElement("a");
-  link.download = "poster.png";
-  link.href = canvas.toDataURL("image/png");
+  const link=document.createElement("a");
+  link.download="poster.png";
+  link.href=canvas.toDataURL("image/png");
   link.click();
 }
 </script>
