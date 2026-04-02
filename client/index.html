@@ -80,7 +80,7 @@ async function generate() {
   try {
     console.log("请求:", url);
 
-    const res = await fetch("https://你的render地址/api/parse?url=" + encodeURIComponent(url));
+    const res = await fetch("https://poster-app-lds4.onrender.com/api/parse?url=" + encodeURIComponent(url));
     const data = await res.json();
 
     console.log("返回:", data);
